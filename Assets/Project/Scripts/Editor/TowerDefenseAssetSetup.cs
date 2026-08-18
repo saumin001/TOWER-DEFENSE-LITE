@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
@@ -86,21 +87,30 @@ public static class TowerDefenseAssetSetup
             asset.cost = 100;
         });
 
-        CreateWaveData(slime, orc);
+        WaveData waves = CreateWaveData(slime, orc);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        Debug.Log($"[Tower Defense] Đã tạo asset thông số trong {Folder}. " +
-                  "Bước tiếp: gán EnemyStats vào từng prefab quái, gán sprite vào TowerStats.");
+        // Gán sẵn luôn thay vì bắt kéo thả tay — đây là chỗ hay sót nhất.
+        AssignStatsToEnemyPrefab(SlimePrefabPath, slime);
+        AssignStatsToEnemyPrefab(OrcPrefabPath, orc);
+        AssignWaveDataToScene(waves);
+
+        AssetDatabase.SaveAssets();
+
+        Debug.Log($"[Tower Defense] Xong. Asset thông số nằm ở {Folder}, " +
+                  "Wave Data đã gán vào EnemySpawner, EnemyStats đã gán vào 2 prefab quái. " +
+                  "Bước tiếp: gán sprite vào 3 TowerStats rồi đặt đế tháp.");
     }
 
-    private static void CreateWaveData(EnemyStats slime, EnemyStats orc)
+    private static WaveData CreateWaveData(EnemyStats slime, EnemyStats orc)
     {
         string path = $"{Folder}/WaveData_Level1.asset";
 
-        if (AssetDatabase.LoadAssetAtPath<WaveData>(path) != null)
-            return;
+        WaveData existing = AssetDatabase.LoadAssetAtPath<WaveData>(path);
+        if (existing != null)
+            return existing;
 
         GameObject slimePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SlimePrefabPath);
         GameObject orcPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(OrcPrefabPath);
@@ -135,6 +145,79 @@ public static class TowerDefenseAssetSetup
         };
 
         AssetDatabase.CreateAsset(waveData, path);
+        return waveData;
+    }
+
+    // ──────────────────────── Tự gán, khỏi kéo thả tay ────────────────────────
+
+    /// <summary>
+    /// Gán WaveData vào EnemySpawner đang có trong scene mở sẵn.
+    /// Trường waveData là private [SerializeField] nên phải ghi qua SerializedObject.
+    /// </summary>
+    private static void AssignWaveDataToScene(WaveData waveData)
+    {
+        if (waveData == null)
+            return;
+
+        var spawner = Object.FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+
+        if (spawner == null)
+        {
+            Debug.LogWarning("[Tower Defense] Không thấy EnemySpawner trong scene đang mở — " +
+                             "mở scene Test rồi chạy lại menu này.");
+            return;
+        }
+
+        var so = new SerializedObject(spawner);
+        var prop = so.FindProperty("waveData");
+
+        if (prop == null)
+            return;
+
+        if (prop.objectReferenceValue != null)
+            return;                       // đã gán rồi thì không đè lên
+
+        prop.objectReferenceValue = waveData;
+        so.ApplyModifiedProperties();
+
+        EditorSceneManager.MarkSceneDirty(spawner.gameObject.scene);
+        Debug.Log("[Tower Defense] Đã gán Wave Data vào EnemySpawner. Nhớ Ctrl+S để lưu scene.");
+    }
+
+    /// <summary>Gán EnemyStats vào prefab quái. Sửa prefab thì phải mở nội dung ra rồi lưu lại.</summary>
+    private static void AssignStatsToEnemyPrefab(string prefabPath, EnemyStats stats)
+    {
+        if (stats == null || AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null)
+            return;
+
+        GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+
+        try
+        {
+            var enemy = root.GetComponent<Enemy>();
+
+            if (enemy == null)
+            {
+                Debug.LogWarning($"[Tower Defense] {prefabPath} chưa có component Enemy.");
+                return;
+            }
+
+            var so = new SerializedObject(enemy);
+            var prop = so.FindProperty("stats");
+
+            if (prop == null || prop.objectReferenceValue != null)
+                return;
+
+            prop.objectReferenceValue = stats;
+            so.ApplyModifiedProperties();
+
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            Debug.Log($"[Tower Defense] Đã gán {stats.name} vào {System.IO.Path.GetFileName(prefabPath)}.");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
     }
 
     private static Wave MakeWave(string name, float delay, params WaveEntry[] entries)
