@@ -19,6 +19,13 @@ public class Enemy : MonoBehaviour
     [Tooltip("Kéo Transform phần ruột thanh máu vào đây. Script co giãn scale X theo % máu.")]
     [SerializeField] private Transform healthBarFill;
 
+    [Header("Hiệu ứng chết")]
+    [Tooltip("Thời gian mờ dần trước khi trả về pool (giây).")]
+    [SerializeField] private float deathFadeDuration = 0.6f;
+
+    [Tooltip("Lún xuống bao nhiêu unit trong lúc mờ dần.")]
+    [SerializeField] private float deathSinkDistance = 0.15f;
+
     /// <summary>Mọi con quái đang sống trên map. Tháp ngắm mục tiêu qua danh sách này.</summary>
     private static readonly List<Enemy> activeEnemies = new List<Enemy>();
 
@@ -204,9 +211,35 @@ public class Enemy : MonoBehaviour
         ReturnToPool();
     }
 
+    /// <summary>
+    /// Diễn cảnh chết rồi mới trả về pool.
+    ///
+    /// Không phụ thuộc vào animation chết: nếu Animator có state "Die" thì nó
+    /// chạy song song, còn không thì riêng phần mờ dần + lún xuống này đã đủ
+    /// đọc được là con quái vừa chết. Nhờ vậy thêm loại quái mới chỉ cần sheet
+    /// đi bộ, khỏi phải có sheet chết khớp nhân vật.
+    /// </summary>
     private IEnumerator ReturnToPoolAfterDeath()
     {
-        yield return new WaitForSeconds(0.6f);
+        Vector3 startPosition = transform.position;
+        float elapsed = 0f;
+
+        while (elapsed < deathFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / deathFadeDuration);
+
+            if (spriteRenderer != null)
+            {
+                Color c = spriteRenderer.color;
+                c.a = 1f - t;
+                spriteRenderer.color = c;
+            }
+
+            transform.position = startPosition + new Vector3(0f, -deathSinkDistance * t, 0f);
+
+            yield return null;
+        }
 
         ReturnToPool();
     }

@@ -23,8 +23,10 @@ public static class TowerDefenseArtImport
 
         { "Towers/Tower_Archer.png", 700f },
         { "Towers/Tower_Barracks.png", 700f },
+        { "Towers/Tower_Cannon.png", 700f },
         { "Towers/Tower_Slot.png", 1000f },
         { "Projectiles/Arrow.png", 2600f },
+        { "Projectiles/Cannonball.png", 2600f },
 
         { "UI/UI_Panel.png", 100f },
         { "UI/Icon_Heart.png", 100f },
