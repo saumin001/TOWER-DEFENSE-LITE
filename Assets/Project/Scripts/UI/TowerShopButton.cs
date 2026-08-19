@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,8 +13,8 @@ public class TowerShopButton : MonoBehaviour
 
     [Header("Hiển thị")]
     [SerializeField] private Image iconImage;
-    [SerializeField] private TMP_Text nameText;
-    [SerializeField] private TMP_Text costText;
+    [SerializeField] private Text nameText;
+    [SerializeField] private Text costText;
 
     [Tooltip("Viền/nền sáng lên khi đang chọn loại tháp này.")]
     [SerializeField] private GameObject selectedIndicator;

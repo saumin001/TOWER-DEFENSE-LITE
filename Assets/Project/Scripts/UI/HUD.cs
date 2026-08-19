@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,9 +8,9 @@ using UnityEngine.UI;
 public class HUD : MonoBehaviour
 {
     [Header("Chữ")]
-    [SerializeField] private TMP_Text livesText;
-    [SerializeField] private TMP_Text coinsText;
-    [SerializeField] private TMP_Text waveText;
+    [SerializeField] private Text livesText;
+    [SerializeField] private Text coinsText;
+    [SerializeField] private Text waveText;
 
     [Header("Thanh máu tổng (không bắt buộc)")]
     [SerializeField] private Image livesFillBar;

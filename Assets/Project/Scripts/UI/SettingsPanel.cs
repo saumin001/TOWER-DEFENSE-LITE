@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,8 +12,8 @@ public class SettingsPanel : MonoBehaviour
     [SerializeField] private Slider sfxSlider;
 
     [Header("Chữ hiển thị % (không bắt buộc)")]
-    [SerializeField] private TMP_Text musicValueText;
-    [SerializeField] private TMP_Text sfxValueText;
+    [SerializeField] private Text musicValueText;
+    [SerializeField] private Text sfxValueText;
 
     private void OnEnable()
     {

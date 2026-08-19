@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,8 +10,8 @@ public class GameEndPanel : MonoBehaviour
     [SerializeField] private GameObject panel;
 
     [Header("Nội dung")]
-    [SerializeField] private TMP_Text titleText;
-    [SerializeField] private TMP_Text messageText;
+    [SerializeField] private Text titleText;
+    [SerializeField] private Text messageText;
 
     [Header("Nút")]
     [SerializeField] private Button restartButton;
