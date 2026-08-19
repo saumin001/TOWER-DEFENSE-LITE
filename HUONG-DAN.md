@@ -14,10 +14,12 @@ Chờ vài giây. Cửa sổ **Console** sẽ in `[Tower Defense] Dựng xong.`
 Menu này tự làm hết những việc đáng lẽ phải kéo thả tay:
 
 - Tạo asset thông số quái, tháp và 5 đợt
-- Tạo prefab `Tower`, `TowerSlot`, `Projectile_Arrow`, `Projectile_Cannonball`
+- Tạo prefab `Tower`, `TowerSlot`, `Projectile_Arrow`, `Projectile_Cannonball`,
+  và `EnemyBoss` (11 khung hoạt ảnh, tự đưa vào đợt 5)
 - Gán ảnh và đạn vào từng loại tháp
 - Đặt **17 đế tháp** dọc đường đi
-- Gắn `GameManager`, `BuildManager`, `AudioManager` và 2 AudioSource
+- Gắn `GameManager`, `BuildManager`, `AudioManager` + 2 AudioSource, và nối
+  sẵn 8 file âm thanh
 - Dựng toàn bộ giao diện: máu, tiền, số đợt, shop 3 tháp, nút tạm dừng, bảng
   cài đặt, màn thắng/thua, kèm EventSystem
 
@@ -47,6 +49,30 @@ Chuột phải để bỏ chọn. Phím `Esc` để tạm dừng.
 Bắt đầu có **150 tiền** và **20 máu**. Giết quái ra tiền, quái đi lọt về Base thì
 trừ máu. Hết 5 đợt mà còn máu là thắng.
 
+**Đợt 5 có boss**: 600 máu, đi chậm, trừ 10 máu Base nếu lọt, giết được thưởng
+100 tiền. To gấp rưỡi quái thường nên nhìn là nhận ra ngay.
+
+---
+
+## Âm thanh
+
+8 file trong `Assets/Project/Audio/` do `Tools/make_audio.py` sinh ra bằng cách
+tổng hợp dạng sóng — **tự tạo hoàn toàn, không dính bản quyền của ai**. Tải nhạc
+trên mạng về dùng cho bài nộp là rủi ro không đáng.
+
+| File | Dùng khi |
+|---|---|
+| `music_loop.wav` | nhạc nền, vòng lặp 16 giây liền mạch |
+| `sfx_tower_shoot.wav` | tháp bắn |
+| `sfx_enemy_death.wav` | quái chết |
+| `sfx_build.wav` | xây xong tháp |
+| `sfx_base_hit.wav` | quái lọt về Base |
+| `sfx_error.wav` | thiếu tiền / đế đã có tháp |
+| `sfx_victory.wav`, `sfx_defeat.wav` | thắng / thua |
+
+Muốn đổi tiếng thì sửa `Tools/make_audio.py` rồi chạy `python3 Tools/make_audio.py`,
+hoặc thay thẳng file `.wav` cùng tên.
+
 ---
 
 ## Nếu gặp trục trặc
@@ -57,13 +83,12 @@ góc dưới bên phải biến mất. Nếu Console có lỗi đỏ thì chụp
 **Bấm Play mà không có quái nào ra** — mở Console xem có dòng
 `[EnemySpawner] Chưa gán Wave Data`. Nếu có, chạy lại menu ở bước 2.
 
-**Đợt 5 không thấy boss** — đúng vậy, chưa có prefab boss. Ảnh boss đã có sẵn ở
-`Assets/Project/Art/Boss/Boss_Walk-Sheet.png` (11 khung, đã cắt sẵn) nhưng chưa
-dựng thành prefab. Game vẫn chạy đủ 5 đợt, chỉ thiếu con boss ở đợt cuối.
+**Đợt 5 không thấy boss** — mở Console xem có dòng `Sheet boss chưa được cắt`.
+Nếu có, đợi Unity import xong art rồi chạy lại menu ở bước 2.
 
-**Không nghe thấy tiếng** — chưa gán file âm thanh nào vào `AudioManager`. Đây là
-chủ ý: bộ art không kèm âm thanh. Kéo file `.wav`/`.mp3` vào các ô trong
-`AudioManager` trên object `GameManager` là có tiếng.
+**Không nghe thấy tiếng** — kiểm tra thanh trượt trong bảng Cài đặt (bấm Esc ▸
+Cài đặt). Âm lượng được nhớ lại giữa các lần chơi, nên nếu lần trước kéo về 0 thì
+lần này vẫn im.
 
 ---
 

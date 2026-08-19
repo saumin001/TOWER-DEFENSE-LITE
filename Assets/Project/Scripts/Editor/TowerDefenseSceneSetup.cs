@@ -55,6 +55,10 @@ public static class TowerDefenseSceneSetup
         WireTowerStats("TowerStats_Melee", $"{ArtTowers}/Tower_Barracks.png", null);
         WireTowerStats("TowerStats_Cannon", $"{ArtTowers}/Tower_Cannon.png", ball);
 
+        // 3b. Boss và đưa nó vào đợt cuối.
+        GameObject boss = CreateBossPrefab();
+        AddBossToLastWave(boss);
+
         // 4. Scene.
         PlaceSlots(slot);
         SetupManagers(tower);
@@ -138,6 +142,131 @@ public static class TowerDefenseSceneSetup
         return saved;
     }
 
+    // ───────────────────────────── Boss ─────────────────────────────
+
+    /// <summary>
+    /// Dựng prefab boss từ sheet đã cắt sẵn 11 khung.
+    ///
+    /// Dùng SpriteSheetAnimator chứ không dùng Animator: việc cần làm chỉ là lật
+    /// qua 11 khung, mà dựng AnimatorController bằng code thì rườm rà và dễ hỏng.
+    /// </summary>
+    private static GameObject CreateBossPrefab()
+    {
+        string path = $"{PrefabFolder}/EnemyBoss.prefab";
+        GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (existing != null) return existing;
+
+        Sprite[] frames = LoadBossFrames();
+        if (frames.Length == 0)
+        {
+            Debug.LogWarning("[Tower Defense] Sheet boss chưa được cắt — bỏ qua prefab boss. "
+                             + "Chạy lại menu này sau khi Unity import xong art.");
+            return null;
+        }
+
+        var go = new GameObject("EnemyBoss");
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = frames[0];
+        sr.sortingOrder = 25;   // trên tháp, để con boss không bị tháp che
+
+        var anim = go.AddComponent<SpriteSheetAnimator>();
+        var aso = new SerializedObject(anim);
+        var arr = aso.FindProperty("frames");
+        if (arr != null)
+        {
+            arr.arraySize = frames.Length;
+            for (int i = 0; i < frames.Length; i++)
+                arr.GetArrayElementAtIndex(i).objectReferenceValue = frames[i];
+        }
+        SetFloat(aso, "fps", 10f);
+        aso.ApplyModifiedProperties();
+
+        var enemy = go.AddComponent<Enemy>();
+        var eso = new SerializedObject(enemy);
+        SetRef(eso, "stats", AssetDatabase.LoadAssetAtPath<EnemyStats>($"{SoFolder}/EnemyStats_Boss.asset"));
+        eso.ApplyModifiedProperties();
+
+        GameObject saved = PrefabUtility.SaveAsPrefabAsset(go, path);
+        Object.DestroyImmediate(go);
+        Debug.Log($"[Tower Defense] Đã tạo prefab boss ({frames.Length} khung).");
+        return saved;
+    }
+
+    /// <summary>Lấy 11 sprite con của sheet boss, xếp đúng thứ tự Boss_Walk_0..10.</summary>
+    private static Sprite[] LoadBossFrames()
+    {
+        Object[] all = AssetDatabase.LoadAllAssetRepresentationsAtPath(
+            "Assets/Project/Art/Boss/Boss_Walk-Sheet.png");
+
+        var list = new List<Sprite>();
+        foreach (Object o in all)
+        {
+            if (o is Sprite s) list.Add(s);
+        }
+
+        // Tên là Boss_Walk_0..Boss_Walk_10; sắp theo SỐ chứ không theo chữ, không thì
+        // thứ tự thành 0,1,10,2,3...
+        list.Sort((a, b) => FrameIndex(a.name).CompareTo(FrameIndex(b.name)));
+        return list.ToArray();
+    }
+
+    private static int FrameIndex(string name)
+    {
+        int i = name.LastIndexOf('_');
+        return i >= 0 && int.TryParse(name.Substring(i + 1), out int n) ? n : 0;
+    }
+
+    /// <summary>Điền prefab boss vào ô còn trống ở đợt cuối của WaveData.</summary>
+    private static void AddBossToLastWave(GameObject boss)
+    {
+        if (boss == null) return;
+
+        var data = AssetDatabase.LoadAssetAtPath<WaveData>($"{SoFolder}/WaveData_Level1.asset");
+        if (data == null || data.waves == null || data.waves.Length == 0) return;
+
+        Wave last = data.waves[data.waves.Length - 1];
+        if (last?.entries == null) return;
+
+        bool changed = false;
+        foreach (WaveEntry entry in last.entries)
+        {
+            // Ô boss được tạo với prefab null từ lúc chưa có prefab boss.
+            if (entry != null && entry.enemyPrefab == null)
+            {
+                entry.enemyPrefab = boss;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            EditorUtility.SetDirty(data);
+            Debug.Log("[Tower Defense] Đã đưa boss vào đợt cuối.");
+        }
+    }
+
+    // ───────────────────────────── Âm thanh ─────────────────────────────
+
+    /// <summary>Gán các file âm thanh sinh sẵn vào AudioManager.</summary>
+    private static void WireAudio(AudioManager audio)
+    {
+        var so = new SerializedObject(audio);
+
+        SetRef(so, "backgroundMusic", Clip("music_loop"));
+        SetRef(so, "towerShootClip", Clip("sfx_tower_shoot"));
+        SetRef(so, "enemyDeathClip", Clip("sfx_enemy_death"));
+        SetRef(so, "buildClip", Clip("sfx_build"));
+        SetRef(so, "baseHitClip", Clip("sfx_base_hit"));
+        SetRef(so, "errorClip", Clip("sfx_error"));
+        SetRef(so, "victoryClip", Clip("sfx_victory"));
+        SetRef(so, "defeatClip", Clip("sfx_defeat"));
+
+        so.ApplyModifiedProperties();
+    }
+
+    private static AudioClip Clip(string name)
+        => AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Project/Audio/{name}.wav");
+
     private static void WireTowerStats(string assetName, string spritePath, GameObject projectile)
     {
         var stats = AssetDatabase.LoadAssetAtPath<TowerStats>($"{SoFolder}/{assetName}.asset");
@@ -185,18 +314,22 @@ public static class TowerDefenseSceneSetup
         so.ApplyModifiedProperties();
 
         // AudioManager cần AudioSource, không có thì mọi lời gọi âm thanh im lặng.
+        var audio = gm.GetComponent<AudioManager>();
         if (gm.GetComponent<AudioSource>() == null)
         {
             var music = gm.AddComponent<AudioSource>();
             music.playOnAwake = false;
+            music.loop = true;
             var sfx = gm.AddComponent<AudioSource>();
             sfx.playOnAwake = false;
 
-            var aso = new SerializedObject(gm.GetComponent<AudioManager>());
+            var aso = new SerializedObject(audio);
             SetRef(aso, "musicSource", music);
             SetRef(aso, "sfxSource", sfx);
             aso.ApplyModifiedProperties();
         }
+
+        WireAudio(audio);
     }
 
     // ───────────────────────────── UI ─────────────────────────────

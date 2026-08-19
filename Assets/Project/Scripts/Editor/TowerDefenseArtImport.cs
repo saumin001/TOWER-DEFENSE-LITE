@@ -94,8 +94,7 @@ public static class TowerDefenseArtImport
     }
 
     /// <summary>
-    /// Cắt sheet boss theo lưới. Pivot đặt ở đáy-giữa để con boss "đứng" đúng
-    /// trên toạ độ của nó, giống cách quái cũ đang dùng.
+    /// Cắt sheet boss theo lưới 11 khung.
     /// </summary>
     private static void SliceBossSheet(TextureImporter importer)
     {
@@ -109,8 +108,10 @@ public static class TowerDefenseArtImport
             {
                 name = $"Boss_Walk_{i}",
                 rect = new Rect(i * BossFrameWidth, 0, BossFrameWidth, BossFrameHeight),
-                alignment = (int)SpriteAlignment.BottomCenter,
-                pivot = new Vector2(0.5f, 0f)
+                // Pivot GIỮA cho khớp Slime và Orc: waypoint nằm giữa đường, quái
+                // pivot đáy sẽ trông như đang lơ lửng phía trên đường.
+                alignment = (int)SpriteAlignment.Center,
+                pivot = new Vector2(0.5f, 0.5f)
             });
         }
 
