@@ -154,7 +154,12 @@ public static class TowerDefenseSceneSetup
     {
         string path = $"{PrefabFolder}/EnemyBoss.prefab";
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        if (existing != null) return existing;
+        if (existing != null)
+        {
+            // Boss đã tạo từ trước: bổ sung thanh máu nếu chưa có (chạy lại menu).
+            TowerDefenseAssetSetup.EnsureHealthBarOnPrefab(path);
+            return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        }
 
         Sprite[] frames = LoadBossFrames();
         if (frames.Length == 0)
@@ -185,6 +190,9 @@ public static class TowerDefenseSceneSetup
         var eso = new SerializedObject(enemy);
         SetRef(eso, "stats", AssetDatabase.LoadAssetAtPath<EnemyStats>($"{SoFolder}/EnemyStats_Boss.asset"));
         eso.ApplyModifiedProperties();
+
+        // Thanh máu trên đầu boss (yêu cầu thêm) — dùng chung hàm với quái thường.
+        TowerDefenseAssetSetup.EnsureHealthBar(go);
 
         GameObject saved = PrefabUtility.SaveAsPrefabAsset(go, path);
         Object.DestroyImmediate(go);

@@ -187,7 +187,7 @@ public static class TowerDefenseAssetSetup
     /// <summary>Gán EnemyStats vào prefab quái. Sửa prefab thì phải mở nội dung ra rồi lưu lại.</summary>
     private static void AssignStatsToEnemyPrefab(string prefabPath, EnemyStats stats)
     {
-        if (stats == null || AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null)
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null)
             return;
 
         GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
@@ -202,17 +202,29 @@ public static class TowerDefenseAssetSetup
                 return;
             }
 
-            var so = new SerializedObject(enemy);
-            var prop = so.FindProperty("stats");
+            bool changed = false;
 
-            if (prop == null || prop.objectReferenceValue != null)
-                return;
+            if (stats != null)
+            {
+                var so = new SerializedObject(enemy);
+                var prop = so.FindProperty("stats");
+                if (prop != null && prop.objectReferenceValue == null)
+                {
+                    prop.objectReferenceValue = stats;
+                    so.ApplyModifiedProperties();
+                    changed = true;
+                }
+            }
 
-            prop.objectReferenceValue = stats;
-            so.ApplyModifiedProperties();
+            // Thanh máu trên đầu quái (yêu cầu thêm). Idempotent: đã có thì bỏ qua.
+            if (EnsureHealthBar(root))
+                changed = true;
 
-            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-            Debug.Log($"[Tower Defense] Đã gán {stats.name} vào {System.IO.Path.GetFileName(prefabPath)}.");
+            if (changed)
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                Debug.Log($"[Tower Defense] Cập nhật {System.IO.Path.GetFileName(prefabPath)} (stats + thanh máu).");
+            }
         }
         finally
         {
@@ -250,6 +262,123 @@ public static class TowerDefenseAssetSetup
         if (!AssetDatabase.IsValidFolder(Folder))
         {
             AssetDatabase.CreateFolder("Assets/Project", "ScriptableObjects");
+        }
+    }
+
+    /// <summary>
+    /// Gắn thanh máu (nền tối + ruột xanh) lên đầu con quái và nối vào
+    /// Enemy.healthBarFill. Enemy.cs co giãn scale X của "HealthBarFill" theo %
+    /// máu; ta đặt nó làm TRỤC ở mép trái để thanh vơi dần từ phải sang.
+    ///
+    /// Idempotent: prefab đã có "HealthBar" thì chỉ nối lại tham chiếu, không tạo
+    /// trùng — chạy lại menu dựng game nhiều lần vẫn an toàn.
+    /// Trả về true nếu vừa TẠO MỚI (để nơi gọi biết cần lưu prefab).
+    /// </summary>
+    public static bool EnsureHealthBar(GameObject root)
+    {
+        if (root == null)
+            return false;
+
+        var enemy = root.GetComponent<Enemy>();
+        if (enemy == null)
+            return false;
+
+        Transform existed = root.transform.Find("HealthBar");
+        if (existed != null)
+        {
+            Transform f = existed.Find("HealthBarFill");
+            if (f != null) AssignHealthBarFill(enemy, f);
+            return false;
+        }
+
+        Sprite white = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        if (white == null)
+        {
+            Debug.LogWarning("[Tower Defense] Không lấy được sprite trắng cho thanh máu — bỏ qua.");
+            return false;
+        }
+
+        Vector2 sw = white.bounds.size;              // kích thước sprite ở scale 1 (unit)
+        if (sw.x <= 0f) sw.x = 1f;
+        if (sw.y <= 0f) sw.y = 1f;
+
+        const float w = 0.75f;      // rộng thanh (unit)
+        const float h = 0.12f;      // cao thanh
+        const float border = 0.04f; // viền nền nhô ra quanh ruột
+
+        // Đặt thanh phía TRÊN ĐẦU quái, cao theo kích thước sprite của chính nó.
+        float yOff = 0.7f;
+        int baseOrder = 50;
+        var sr = root.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            if (sr.sprite != null) yOff = sr.sprite.bounds.max.y + 0.18f;
+            baseOrder = sr.sortingOrder + 5;
+        }
+
+        var bar = new GameObject("HealthBar");
+        bar.transform.SetParent(root.transform, false);
+        bar.transform.localPosition = new Vector3(0f, yOff, 0f);
+
+        // Nền tối
+        var bg = new GameObject("BG");
+        bg.transform.SetParent(bar.transform, false);
+        bg.transform.localPosition = Vector3.zero;
+        bg.transform.localScale = new Vector3((w + border) / sw.x, (h + border) / sw.y, 1f);
+        var bgSr = bg.AddComponent<SpriteRenderer>();
+        bgSr.sprite = white;
+        bgSr.color = new Color(0.10f, 0.10f, 0.12f, 0.85f);
+        bgSr.sortingOrder = baseOrder;
+
+        // Trục co giãn: đặt ở MÉP TRÁI để ruột vơi từ phải sang. Đây là healthBarFill.
+        var fillPivot = new GameObject("HealthBarFill");
+        fillPivot.transform.SetParent(bar.transform, false);
+        fillPivot.transform.localPosition = new Vector3(-w / 2f, 0f, 0f);
+        fillPivot.transform.localScale = Vector3.one;
+
+        // Ruột xanh (mép trái nằm đúng gốc của trục)
+        var fill = new GameObject("Fill");
+        fill.transform.SetParent(fillPivot.transform, false);
+        fill.transform.localPosition = new Vector3(w / 2f, 0f, 0f);
+        fill.transform.localScale = new Vector3(w / sw.x, h / sw.y, 1f);
+        var fillSr = fill.AddComponent<SpriteRenderer>();
+        fillSr.sprite = white;
+        fillSr.color = new Color(0.25f, 0.85f, 0.35f, 1f);
+        fillSr.sortingOrder = baseOrder + 1;
+
+        AssignHealthBarFill(enemy, fillPivot.transform);
+        return true;
+    }
+
+    /// <summary>Mở một prefab quái có sẵn ra và thêm thanh máu nếu chưa có, rồi lưu lại.</summary>
+    public static void EnsureHealthBarOnPrefab(string prefabPath)
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null)
+            return;
+
+        GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+        try
+        {
+            if (EnsureHealthBar(root))
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                Debug.Log($"[Tower Defense] Đã thêm thanh máu vào {System.IO.Path.GetFileName(prefabPath)}.");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    private static void AssignHealthBarFill(Enemy enemy, Transform fill)
+    {
+        var so = new SerializedObject(enemy);
+        var p = so.FindProperty("healthBarFill");
+        if (p != null && p.objectReferenceValue != fill)
+        {
+            p.objectReferenceValue = fill;
+            so.ApplyModifiedProperties();
         }
     }
 
